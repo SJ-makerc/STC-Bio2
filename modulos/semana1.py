@@ -3,71 +3,87 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
-# 1. CONFIGURACIÓN DE RUTAS
+# Configuración de rutas
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_PATH = os.path.join(BASE_DIR, 'datos')
 RESULT_PATH = os.path.join(BASE_DIR, 'resultados')
 
-if not os.path.exists(RESULT_PATH):
-    os.makedirs(RESULT_PATH)
+class AdquisicionPhysioNet:
+    """
+    Clase para gestionar la descarga, lectura y visualización de señales
+    provenientes de la base de datos MIT-BIH de PhysioNet.
+    """
 
+    def __init__(self, nombre_registro):
+        """
+        Inicializa la clase con el nombre del registro y define las rutas.
+        :param nombre_registro: ID del registro (ej. '100')
+        """
+        self.nombre_reg = nombre_registro
+        self.ruta_completa = os.path.join(DATA_PATH, nombre_registro)
+        self.record = None
+        self.ann = None
 
-def graficar_semana_1(nombre_reg, segundos=10):
-    ruta_reg = os.path.join(DATA_PATH, nombre_reg)
+    def leer_metadatos(self):
+        """
+        Lee el archivo .hea y extrae la frecuencia de muestreo y metadatos.
+        Imprime la información técnica en la consola.
+        """
+        self.record = wfdb.rdrecord(self.ruta_completa)
+        fs = self.record.fs
+        unidades = self.record.units[0]
+        n_derivaciones = self.record.n_sig
+        duracion_seg = self.record.sig_len / fs
 
-    # --- PUNTO 2: LECTURA Y EXTRACCIÓN DE METADATOS ---
-    # Leemos el registro completo para extraer la info del encabezado (.hea)
-    record = wfdb.rdrecord(ruta_reg)
+        print(f"\n" + "="*40)
+        print(f"ANÁLISIS DEL REGISTRO: {self.nombre_reg}")
+        print(f"Frecuencia de Muestreo: {fs} Hz")
+        print(f"Duración Total: {duracion_seg:.2f} segundos")
+        print(f"Número de Derivaciones: {n_derivaciones}")
+        print(f"Unidades de la Señal: {unidades}")
+        print("="*40)
 
-    # Extracción de variables requeridas
-    fs = record.fs
-    unidades = record.units[0]  # Usualmente 'mV'
-    n_derivaciones = record.n_sig
-    nombres_deriv = record.sig_name
-    duracion_seg = record.sig_len / fs
+    def graficar_señal(self, segundos=10):
+        """
+        Genera una gráfica de la señal en mV con sus respectivas anotaciones.
+        :param segundos: Cantidad de tiempo a visualizar.
+        """
+        muestras = int(self.record.fs * segundos)
+        record_plot = wfdb.rdrecord(self.ruta_completa, sampto=muestras)
+        self.ann = wfdb.rdann(self.ruta_completa, 'atr', sampto=muestras)
 
-    # Impresión en consola según requerimiento de la guía
-    print(f"\n" + "=" * 40)
-    print(f"ANÁLISIS DEL REGISTRO: {nombre_reg}")
-    print(f"Frecuencia de Muestreo: {fs} Hz")
-    print(f"Duración Total: {duracion_seg:.2f} segundos")
-    print(f"Número de Derivaciones: {n_derivaciones}")
-    print(f"Nombres de Derivaciones: {nombres_deriv}")
-    print(f"Unidades de la Señal: {unidades}")
-    print("=" * 40)
+        tiempo = np.arange(len(record_plot.p_signal)) / self.record.fs
+        senal = record_plot.p_signal[:, 0]
 
-    # --- PUNTO 3: VISUALIZACIÓN ---
-    # Volvemos a leer solo los 10 segundos para la gráfica
-    muestras_10s = int(fs * segundos)
-    record_plot = wfdb.rdrecord(ruta_reg, sampto=muestras_10s)
-    ann = wfdb.rdann(ruta_reg, 'atr', sampto=muestras_10s)
+        plt.figure(figsize=(12, 5))
+        # Se agrega 'label' para cumplir con el requisito de leyenda
+        plt.plot(tiempo, senal, color='black', lw=0.8, label=f'ECG (Canal {record_plot.sig_name[0]})')
 
-    tiempo = np.arange(len(record_plot.p_signal)) / fs
-    senal = record_plot.p_signal[:, 0]
+        # Superponer anotaciones
+        for i in range(len(self.ann.sample)):
+            pos_x = self.ann.sample[i] / self.record.fs
+            plt.axvline(x=pos_x, color='red', linestyle='--', alpha=0.5)
+            if i == 0: # Solo ponemos label a la primera línea para la leyenda
+                plt.axvline(x=pos_x, color='red', linestyle='--', alpha=0.5, label='Anotaciones MIT')
+            plt.text(pos_x, max(senal), self.ann.symbol[i], color='red', fontweight='bold')
 
-    plt.figure(figsize=(12, 5))
-    plt.plot(tiempo, senal, color='black', lw=0.8)
+        plt.title(f"Visualización Semana 1 - Registro {self.nombre_reg}")
+        plt.xlabel("Tiempo (s)")
+        plt.ylabel(f"Amplitud ({self.record.units[0]})")
+        plt.grid(True, alpha=0.3)
+        plt.legend(loc='upper right') # REQUISITO: Leyenda incluida
+        plt.tight_layout()
 
-    # Superponer anotaciones (Líneas rojas y símbolos)
-    for i in range(len(ann.sample)):
-        posicion_x = ann.sample[i] / fs
-        plt.axvline(x=posicion_x, color='red', linestyle='--', alpha=0.5)
-        plt.text(posicion_x, max(senal), ann.symbol[i],
-                 color='red', fontweight='bold', horizontalalignment='center')
-
-    plt.title(f"Visualización Semana 1 - Registro {nombre_reg} ({segundos} segundos)")
-    plt.xlabel("Tiempo (s)")
-    plt.ylabel(f"Amplitud ({unidades})")  # Usamos las unidades extraídas del .hea
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-
-    plt.savefig(os.path.join(RESULT_PATH, f'grafica_semana1_{nombre_reg}.png'))
-    plt.show()
-
+        if not os.path.exists(RESULT_PATH):
+            os.makedirs(RESULT_PATH)
+        plt.savefig(os.path.join(RESULT_PATH, f'grafica_{self.nombre_reg}.png'))
+        plt.show()
 
 if __name__ == "__main__":
-    if os.path.exists(os.path.join(DATA_PATH, '100.hea')):
-        graficar_semana_1('100')
-        graficar_semana_1('105')
-    else:
-        print("Error: Registros no encontrados. Ejecuta primero descarga_datos.py")
+    for reg_id in ['100', '105']:
+        if os.path.exists(os.path.join(DATA_PATH, f'{reg_id}.hea')):
+            obj = AdquisicionPhysioNet(reg_id)
+            obj.leer_metadatos()
+            obj.graficar_señal(10)
+        else:
+            print(f"Error: No se encuentra el registro {reg_id}")
