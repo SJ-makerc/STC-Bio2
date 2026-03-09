@@ -9,4 +9,4 @@ En la Sierra Nevada y la Serranía del Perijá, el acceso a especialistas es lim
 1. Configurar el entorno: `conda create -n stcsierra python=3.10`
 2. Instalar dependencias: `pip install -r requirements.txt`
 3. Descargar datos: Ejecutar `python modulos/descarga_datos.py`
-4. Procesar Semana 1: Ejecutar `python modulos/semana1.py`
+4. Procesar Semana 1: Ejecutar `python modulos/semana1.py`n
