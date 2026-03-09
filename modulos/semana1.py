@@ -47,7 +47,7 @@ class AdquisicionPhysioNet:
     def graficar_señal(self, segundos=10):
         """
         Genera una gráfica de la señal en mV con sus respectivas anotaciones.
-        Ajusta los ejes para eliminar espacios desaprovechados.
+        Ajusta los ejes para mayor precisión (marcas cada 1 segundo).
         :param segundos: Cantidad de tiempo a visualizar.
         """
         muestras = int(self.record.fs * segundos)
@@ -57,7 +57,7 @@ class AdquisicionPhysioNet:
         tiempo = np.arange(len(record_plot.p_signal)) / self.record.fs
         senal = record_plot.p_signal[:, 0]
 
-        plt.figure(figsize=(12, 5))
+        plt.figure(figsize=(14, 5))  # Aumentamos ligeramente el ancho para que los números no se amontonen
 
         # Graficar la señal
         plt.plot(tiempo, senal, color='black', lw=0.9, label=f'ECG (Canal {record_plot.sig_name[0]})')
@@ -67,21 +67,24 @@ class AdquisicionPhysioNet:
             pos_x = self.ann.sample[i] / self.record.fs
             plt.axvline(x=pos_x, color='red', linestyle='--', alpha=0.4, lw=1)
 
-            # Solo etiquetar la primera anotación en la leyenda
-            label_text = 'Anotación MIT' if i == 0 else ""
             if i == 0:
                 plt.plot([], [], color='red', linestyle='--', alpha=0.4, label='Anotaciones MIT')
 
             plt.text(pos_x, max(senal), self.ann.symbol[i], color='red',
                      fontweight='bold', horizontalalignment='center')
 
-        # --- MEJORA DE EJES Y LÍMITES ---
-        plt.xlim(0, segundos)  # AJUSTE CLAVE: Elimina los espacios a los lados
+        # --- MEJORA DE PRECISIÓN EN EJES ---
+        plt.xlim(0, segundos)
 
-        plt.title(f"Visualización Semana 1 - Registro {self.nombre_reg}")
+        # Definimos las marcas del eje X de 1 en 1 segundo
+        plt.xticks(np.arange(0, segundos + 1, 1))
+
+        plt.title(f"Visualización Semana 1 - Registro {self.nombre_reg} ({segundos}s)")
         plt.xlabel("Tiempo (s)")
         plt.ylabel(f"Amplitud ({self.record.units[0]})")
-        plt.grid(True, which='both', linestyle=':', alpha=0.5)
+
+        # Grid más marcado para facilitar la lectura tipo papel milimetrado
+        plt.grid(True, which='both', linestyle='--', alpha=0.5)
         plt.legend(loc='upper right')
 
         plt.tight_layout()
